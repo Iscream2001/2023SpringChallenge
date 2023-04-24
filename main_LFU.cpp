@@ -38,30 +38,62 @@ int num_buf_in[MAXN];
 
 int las_ins_pos;
 
+int ad_Time[MAXN][MAXDB];
+
 list<pair<int, int>>::iterator mp[MAXBUF];
-struct LRUCache {
-    list<pair<int, int>> lru_list;  // pos time
+
+struct SetNode {
+    int rat, where, time;
+};
+bool operator<(SetNode x, SetNode y) {
+    if (x.rat != y.rat) return x.rat < y.rat;
+    return x.where < y.where;
+}
+
+set<SetNode>::iterator it[MAXBUF];
+struct LFRUCache {
+    int pri_size;
+    multiset<SetNode> pri;
+    list<pair<int, int>> lru_list;
     pair<int, int> getLeastUsed() {
-        if (lru_list.empty()) {
-            // cerr << "The lru_list is empty!" << endl;
+        if (lru_list.empty() == 0) {
+            return lru_list.back();
+        } else if (pri.empty()) {
             return make_pair(-1, -1);
         }
-        return lru_list.back();
+        return make_pair(pri.begin()->where, pri.begin()->time);
+        // if (lru_list.empty()) {
+        //     // cerr << "The lru_list is empty!" << endl;
+        //     return make_pair(-1, -1);
+        // }
+        // return lru_list.back();
     }
     void add(int where, int request_id) {
-        lru_list.push_front(make_pair(where, request_id));
-        mp[where] = lru_list.begin();
+        // cerr << "in " << ad_Time[InCache[where].us][InCache[where].buf_id]
+        //      << " " << where << " " << request_id << endl;
+        SetNode tmp =
+            SetNode {ad_Time[InCache[where].us][InCache[where].buf_id], where,
+                     request_id};
+        S.insert(tmp);
+        it[where] = S.lower_bound(tmp);
+        // mp[where] = lru_list.begin();
         return;
     }
     void delPoint(int where) {
+        set<SetNode>::iterator iit;
         if (where == 0) {
-            where = lru_list.back().first;
+            iit = S.begin();
+            // where = lru_list.back().first;
+        } else {
+            iit = it[where];
         }
-        lru_list.erase(mp[where]);
+
+        S.erase(iit);
+        // lru_list.erase(mp[where]);
         // mp[where] = NULL;
     }
 };
-LRUCache lru_one[MAXN];
+LFRUCache lru_one[MAXN];
 
 struct LRUBase {
     int capacity, SLA;
@@ -117,12 +149,12 @@ void InitData() {
     }
 }
 
-void PUT(int id) {
-    for (auto x : lru_one[id].lru_list) {
-        cerr << x.first << " " << x.second << endl;
-    }
-    return;
-}
+// void PUT(int id) {
+//     for (auto x : lru_one[id].lru_list) {
+//         cerr << x.first << " " << x.second << endl;
+//     }
+//     return;
+// }
 
 void DelBuf(int where) {
     if (InCache[where].us == 0) {
@@ -148,11 +180,10 @@ void InsBuf(int request_id, int where, UserBuf req) {
         return;
     }
 
-    lru_one[req.us].add(where, request_id);
-
     InCache[where] = req;
     where_user_buf[req.us][req.buf_id] = where;
     num_buf_in[req.us]++;
+    lru_one[req.us].add(where, request_id);
     // if (req.us == 1) {
     //     cerr << request_id << " " << req.us << " " << num_buf_in[1] << endl;
     //     PUT(1);
@@ -424,10 +455,13 @@ void MAIN() {
 
     // Init
     InitData();
-
+    for (int i = 1; i <= n; ++i) {
+        lru_one[i].pri_size = buf_size_config[i].base_buf_size / 3 + 1;
+    }
     // solve requests
     for (int request_id = 1; request_id <= num_request; ++request_id) {
         cin >> req.us >> req.buf_id;
+        ++ad_Time[req.us][req.buf_id];
         // cerr << request_id << endl;
         // cerr << req.us << " " << req.buf_id << endl;
         lru_base[req.us].add(req.buf_id);
@@ -473,8 +507,8 @@ void MAIN() {
 }
 
 int main() {
-    freopen("data/8.in", "r", stdin);
-    freopen("data/8.out", "w", stdout);
+    // freopen("data/8.in", "r", stdin);
+    // freopen("data/8.out", "w", stdout);
     srand(time(0));
     std::ios::sync_with_stdio(false);
     int ttt = 1;
